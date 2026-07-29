@@ -1,0 +1,124 @@
+{
+  "name": "Centralized Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e1e1e1e1-0001-0001-0001-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    'Timestamp': $json.execution.error.timestamp || $now,\n    'Workflow': $json.workflow.name,\n    'Node': $json.execution.lastNodeExecuted || ($json.execution.error.node ? $json.execution.error.node.name : 'Unknown'),\n    'Error Message': $json.execution.error.message || 'Unknown Error',\n    'Input Data': JSON.stringify($json.execution.error.description || 'No additional data')\n  }\n}];"
+      },
+      "id": "e1e1e1e1-0004-0004-0004-000000000004",
+      "name": "Format Error Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Errors",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "e1e1e1e1-0002-0002-0002-000000000002",
+      "name": "Log to Errors Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        650,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "google-api-service-account-cred",
+          "name": "Google API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "text": "=⚠️ <b>n8n Workflow Error</b>\n\n<b>Workflow:</b> {{ $json['Workflow'] }}\n<b>Node:</b> {{ $json['Node'] }}\n<b>Error:</b> <code>{{ $json['Error Message'] }}</code>",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "e1e1e1e1-0003-0003-0003-000000000003",
+      "name": "Notify Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        760,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred",
+          "name": "Telegram Bot API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Data": {
+      "main": [
+        [
+          {
+            "node": "Log to Errors Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Errors Sheet": {
+      "main": [
+        [
+          {
+            "node": "Notify Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "v1.0.0"
+}

@@ -1,0 +1,695 @@
+{
+  "name": "Customer Support Ticket Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "ticket",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "webhook-header-auth",
+          "name": "Header Auth"
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Webhook — Receive Ticket",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        400
+      ],
+      "webhookId": "ticket-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.body || $input.first().json;\nconst errors = [];\n\n// 1. Required fields check\nconst required = ['customer_name', 'email', 'subject', 'message', 'priority'];\nfor (const field of required) {\n  if (!input[field] || String(input[field]).trim() === '') {\n    errors.push(`Missing required field: ${field}`);\n  }\n}\n\n// 2. Email format validation\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (input.email && !emailRegex.test(input.email)) {\n  errors.push('Invalid email format');\n}\n\n// 3. Priority enum validation\nconst validPriorities = ['High', 'Medium', 'Low'];\nif (input.priority && !validPriorities.includes(input.priority)) {\n  errors.push(`Invalid priority. Must be one of: ${validPriorities.join(', ')}`);\n}\n\nif (errors.length > 0) {\n  return [{ json: { valid: false, errors, original: input } }];\n}\n\nreturn [{\n  json: {\n    valid: true,\n    customer_name: String(input.customer_name).trim(),\n    email: String(input.email).trim().toLowerCase(),\n    subject: String(input.subject).trim(),\n    message: String(input.message).trim(),\n    priority: input.priority\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Validate — Input Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "Route — Validation Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Invalid request.\",\n  \"errors\": {{ JSON.stringify($json.errors) }}\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "Respond — Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        900,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tickets",
+          "mode": "name"
+        },
+        "filtersUI": {},
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "a1b2c3d4-0006-0006-0006-000000000006",
+      "name": "Lookup — Recent Tickets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "google-api-service-account-cred",
+          "name": "Google API"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Lookup — Recent Tickets').all().map(i => i.json);\nconst input = $('Validate — Input Fields').first().json;\n\nconst isDuplicate = rows.some(row => {\n  const rowEmail = row['Email'] || row.email;\n  const rowSubject = row['Subject'] || row.subject;\n  \n  if (!rowEmail || !rowSubject) return false;\n  \n  return (\n    rowEmail.toLowerCase() === input.email.toLowerCase() &&\n    rowSubject === input.subject\n  );\n});\n\nreturn [{ json: { ...input, isDuplicate } }];"
+      },
+      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "name": "Check — Duplicate Ticket",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-duplicate",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0007-0007-0007-000000000007",
+      "name": "Route — Duplicate Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Duplicate ticket detected. A similar ticket was submitted within the last 24 hours.\",\n  \"ticket_created\": false\n}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "a1b2c3d4-0008-0008-0008-000000000008",
+      "name": "Respond — Duplicate Detected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $vars.AI_MODEL || 'gpt-4o-mini' }}\",\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a customer support ticket classifier. Analyze tickets and return ONLY valid JSON with exactly these fields: category (one of: Technical Issue, Billing, Account Access, General Inquiry, Bug Report, Feature Request), summary (one concise sentence), sentiment (one of: Positive, Neutral, Negative).\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Ticket Details:\\nCustomer: {{ $('Check — Duplicate Ticket').item.json.customer_name }}\\nSubject: {{ $('Check — Duplicate Ticket').item.json.subject }}\\nMessage: {{ $('Check — Duplicate Ticket').item.json.message }}\\nPriority: {{ $('Check — Duplicate Ticket').item.json.priority }}\"\n    }\n  ],\n  \"temperature\": 0\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "a1b2c3d4-0009-0009-0009-000000000009",
+      "name": "AI — Analyze Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        380
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\n\nlet parsed = {};\ntry {\n  if (raw.choices && raw.choices[0]) {\n    const content = raw.choices[0].message.content;\n    parsed = typeof content === 'string' ? JSON.parse(content) : content;\n  } else if (raw.error) {\n    console.log('AI Error:', JSON.stringify(raw.error));\n    parsed = {};\n  } else {\n    parsed = raw;\n  }\n} catch (e) {\n  console.log('AI parse error:', e.message);\n  parsed = {};\n}\n\nconst validCategories = ['Technical Issue', 'Billing', 'Account Access', 'General Inquiry', 'Bug Report', 'Feature Request'];\nconst validSentiments = ['Positive', 'Neutral', 'Negative'];\n\nconst result = {\n  category: validCategories.includes(parsed.category) ? parsed.category : 'General Inquiry',\n  summary: parsed.summary || 'Customer submitted a support request.',\n  sentiment: validSentiments.includes(parsed.sentiment) ? parsed.sentiment : 'Neutral',\n  ai_processed: !!parsed.category\n};\n\nreturn [{ json: result }];"
+      },
+      "id": "a1b2c3d4-0010-0010-0010-000000000010",
+      "name": "Parse — AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Check — Duplicate Ticket').item.json.priority }}",
+                    "rightValue": "High",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "High Priority"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Check — Duplicate Ticket').item.json.priority }}",
+                    "rightValue": "Medium",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Medium Priority"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Check — Duplicate Ticket').item.json.priority }}",
+                    "rightValue": "Low",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Low Priority"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a1b2c3d4-0011-0011-0011-000000000011",
+      "name": "Route — By Priority",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2000,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "text": "=🚨 <b>HIGH PRIORITY TICKET</b> 🚨\n\n<b>From:</b> {{ $('Check — Duplicate Ticket').item.json.customer_name }}\n<b>Subject:</b> {{ $('Check — Duplicate Ticket').item.json.subject }}\n<b>Category:</b> {{ $('Parse — AI Response').item.json.category }}\n\n<b>Summary:</b> {{ $('Parse — AI Response').item.json.summary }}\n📊 <b>Sentiment:</b> {{ $('Parse — AI Response').item.json.sentiment }}\n🕐 <b>Time:</b> {{ $now.toISO() }}\n\n⚡ Immediate attention required!",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "a1b2c3d4-0012-0012-0012-000000000012",
+      "name": "Notify — Telegram High Priority",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2220,
+        240
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred",
+          "name": "Telegram Bot account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0013-0013-0013-000000000013",
+      "name": "Merge — Rejoin After Routing",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2440,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('Check — Duplicate Ticket').first().json;\nconst ai = $('Parse — AI Response').first().json;\n\nconst ticket_id = 'TKT-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6).toUpperCase();\n\nreturn [{\n  json: {\n    'Ticket ID': ticket_id,\n    'Customer Name': input.customer_name,\n    'Email': input.email,\n    'Subject': input.subject,\n    'Message': input.message,\n    'Priority': input.priority,\n    'Category': ai.category,\n    'Summary': ai.summary,\n    'Sentiment': ai.sentiment,\n    'Created Date': new Date().toISOString(),\n    'Status': 'Open'\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0014-0014-0014-000000000014",
+      "name": "Prepare — Ticket Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tickets",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0015-0015-0015-000000000015",
+      "name": "Store — Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2880,
+        380
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "google-api-service-account-cred",
+          "name": "Google API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EXTERNAL_API_URL || 'https://httpbin.org/post' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Source",
+              "value": "n8n-ticket-system"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { ticket_id: $json['Ticket ID'], customer_name: $json['Customer Name'], email: $json['Email'], subject: $json['Subject'], priority: $json['Priority'], category: $json['Category'], summary: $json['Summary'], created_at: $json['Created Date'] } }}",
+        "options": {
+          "timeout": 15000
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "id": "a1b2c3d4-0016-0016-0016-000000000016",
+      "name": "API — Forward Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3100,
+        380
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ticket = $('Prepare — Ticket Data').first().json;\nconst apiResponse = $input.first().json;\n\nconst warnings = [];\n\nif (apiResponse.error) {\n  let errorMsg = apiResponse.error.message || apiResponse.error;\n  warnings.push('External API forwarding failed: ' + errorMsg);\n}\n\nconst response = {\n  success: true,\n  ticket_created: true,\n  ticket_id: ticket['Ticket ID'],\n  category: ticket['Category'],\n  priority: ticket['Priority'],\n  message: 'Your support ticket has been received and is being processed.'\n};\n\nif (warnings.length > 0) {\n  response.warnings = warnings;\n}\n\nreturn [{ json: response }];"
+      },
+      "id": "a1b2c3d4-0017-0017-0017-000000000017",
+      "name": "Build — Final Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3320,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1b2c3d4-0018-0018-0018-000000000018",
+      "name": "Respond — Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        3540,
+        380
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Receive Ticket": {
+      "main": [
+        [
+          {
+            "node": "Validate — Input Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate — Input Fields": {
+      "main": [
+        [
+          {
+            "node": "Route — Validation Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route — Validation Check": {
+      "main": [
+        [
+          {
+            "node": "Lookup — Recent Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond — Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup — Recent Tickets": {
+      "main": [
+        [
+          {
+            "node": "Check — Duplicate Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check — Duplicate Ticket": {
+      "main": [
+        [
+          {
+            "node": "Route — Duplicate Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route — Duplicate Check": {
+      "main": [
+        [
+          {
+            "node": "Respond — Duplicate Detected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI — Analyze Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI — Analyze Ticket": {
+      "main": [
+        [
+          {
+            "node": "Parse — AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse — AI Response": {
+      "main": [
+        [
+          {
+            "node": "Route — By Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route — By Priority": {
+      "main": [
+        [
+          {
+            "node": "Notify — Telegram High Priority",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge — Rejoin After Routing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge — Rejoin After Routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify — Telegram High Priority": {
+      "main": [
+        [
+          {
+            "node": "Merge — Rejoin After Routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge — Rejoin After Routing": {
+      "main": [
+        [
+          {
+            "node": "Prepare — Ticket Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare — Ticket Data": {
+      "main": [
+        [
+          {
+            "node": "Store — Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store — Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "API — Forward Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API — Forward Ticket": {
+      "main": [
+        [
+          {
+            "node": "Build — Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build — Final Response": {
+      "main": [
+        [
+          {
+            "node": "Respond — Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "Customer Support — Error Handler"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2026-07-29T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "id": "tag-001",
+      "name": "customer-support"
+    },
+    {
+      "createdAt": "2026-07-29T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "id": "tag-002",
+      "name": "production"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2026-07-29T00:00:00.000Z",
+  "versionId": "v1.0.0"
+}

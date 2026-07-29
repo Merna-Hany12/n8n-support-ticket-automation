@@ -1,0 +1,102 @@
+### n8n Customer Support Workflow Tests
+### Usage: You can use the "REST Client" extension in VS Code to run these directly,
+### or import this format into Postman/Insomnia.
+
+@webhook_url = https://mernagazer.app.n8n.cloud/webhook/ticket
+@api_key = my-secure-api-key-123
+
+
+### 1. Valid High Priority Ticket (Should trigger Telegram & Sheet)
+POST {{webhook_url}}
+Content-Type: application/json
+X-API-Key: {{api_key}}
+
+{
+    "customer_name": "merna ",
+    "email": "Mernahany@example.com",
+    "priority": "High",
+    "subject": "System completely down",
+    "message": "I cannot log in and my entire team is blocked."
+}
+
+
+### 2. Valid Medium Priority Ticket (Should trigger Sheet only)
+POST {{webhook_url}}
+Content-Type: application/json
+X-API-Key: {{api_key}}
+
+{
+    "customer_name": "Sarh Smith",
+    "email": "sarahsmith@example.com",
+    "priority": "Medium",
+    "subject": "Billing Question",
+    "message": "Can you help me understand the charges on my latest invoice?"
+}
+
+
+### 3. Valid Low Priority Ticket (Should trigger Sheet only)
+POST {{webhook_url}}
+Content-Type: application/json
+X-API-Key: {{api_key}}
+
+{
+    "customer_name": "John Doe",
+    "email": "john.doe@example.com",
+    "priority": "Low",
+    "subject": "Feature Request",
+    "message": "It would be great if you could add a dark mode to the dashboard."
+}
+
+
+### 4. Duplicate Ticket Test (Run this twice - the second time should return 409 Conflict)
+POST {{webhook_url}}
+Content-Type: application/json
+X-API-Key: {{api_key}}
+
+{
+    "customer_name": "Duplicate Tester",
+    "email": "tester@example.com",
+    "priority": "High",
+    "subject": "Testing Duplicates",
+    "message": "This is a test for the duplicate detection system."
+}
+
+
+### 5. Validation Error: Missing Required Field (Should return 400 Bad Request)
+POST {{webhook_url}}
+Content-Type: application/json
+X-API-Key: {{api_key}}
+
+{
+    "customer_name": "Missing Data",
+    "priority": "High",
+    "message": "I forgot to include my email and subject."
+}
+
+
+### 6. Validation Error: Invalid Email Format (Should return 400 Bad Request)
+POST {{webhook_url}}
+Content-Type: application/json
+X-API-Key: {{api_key}}
+
+{
+    "customer_name": "Bad Email",
+    "email": "this-is-not-an-email",
+    "priority": "Medium",
+    "subject": "Invalid Email Test",
+    "message": "Testing the regex validation."
+}
+
+
+### 7. Validation Error: Invalid Priority (Should return 400 Bad Request)
+POST {{webhook_url}}
+Content-Type: application/json
+X-API-Key: {{api_key}}
+
+{
+    "customer_name": "Wrong Priority",
+    "email": "priority@example.com",
+    "priority": "Critical", 
+    "subject": "Invalid Priority Test",
+    "message": "Priority must be High, Medium, or Low. Critical should fail."
+}
