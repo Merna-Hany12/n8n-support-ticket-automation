@@ -693,32 +693,4 @@ A separate **Error Handler** workflow is referenced in the main workflow setting
 | ✅ Centralized Error Workflow | Referenced in workflow settings |
 | ✅ Environment variables | All credentials and IDs via `$env.*` expressions |
 
----
 
-## File Structure
-
-```
-n8n-assessment/
-├── workflow.json       # Main workflow export
-├── docker-compose.yml  # Docker container configuration
-├── .env.example        # Environment variables template
-├── tests.http          # Executable test cases for VS Code REST Client/Postman
-├── setup_sheet.gs      # Google Apps Script for automated sheet formatting
-├── README.md           # This file
-└── screenshots/
-    ├── 01_success_execution.png
-    ├── 02_high_priority_telegram.png
-    └── 03_validation_failure.png
-```
-
----
-
-## Author Notes
-
-This workflow was designed with **maintainability and extensibility** as primary concerns. Every node has a clear, descriptive name following the `Role — Description` convention. The separation of concerns (validate → detect → analyze → route → prepare → store → forward → respond) makes each step independently testable and replaceable.
-
-During a live interview, I can:
-- Swap Google Sheets for PostgreSQL by modifying nodes 5 and 15 only
-- Add a new priority level by adding one Switch case
-- Extend AI output with additional fields by updating the prompt and Parse node
-- Add email notifications alongside Telegram in parallel using a parallel branch before the Merge node
