@@ -19,6 +19,18 @@ This workflow automates the **end-to-end processing of customer support tickets*
 7. **Forwards** to an external API (httpbin.org / configurable)
 8. **Returns** a structured JSON response to the caller
 
+## Repository Structure
+
+```text
+n8n-support-ticket-automation/
+├── assets/                  # 8 execution screenshots
+├── README.md                # This documentation file
+├── error_workflow.json      # Centralized Error Handler workflow
+├── setup_sheet.gs           # Google Apps Script for automated sheet setup
+├── tests.http               # Professional REST Client test suite
+└── workflow.json            # Main production workflow
+```
+
 ---
 
 ## Execution Evidence & Screenshots
