@@ -125,7 +125,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = $('Lookup — Recent Tickets').all().map(i => i.json);\nconst input = $('Validate — Input Fields').first().json;\n\nconst isDuplicate = rows.some(row => {\n  const rowEmail = row['Email'] || row.email;\n  const rowSubject = row['Subject'] || row.subject;\n  \n  if (!rowEmail || !rowSubject) return false;\n  \n  return (\n    rowEmail.toLowerCase() === input.email.toLowerCase() &&\n    rowSubject === input.subject\n  );\n});\n\nreturn [{ json: { ...input, isDuplicate } }];"
+        "jsCode": "const rows = $('Lookup — Recent Tickets').all().map(i => i.json);\nconst input = $('Validate — Input Fields').first().json;\n\n// Duplicate = same email + same subject, submitted within the last 24 hours\nconst DUPLICATE_WINDOW_HOURS = 24;\nconst now = Date.now();\n\nconst isDuplicate = rows.some(row => {\n  const rowEmail = row['Email'] || row.email;\n  const rowSubject = row['Subject'] || row.subject;\n  const rowCreatedRaw = row['Created Date'] || row.created_date;\n\n  if (!rowEmail || !rowSubject || !rowCreatedRaw) return false;\n\n  const rowCreatedTime = new Date(rowCreatedRaw).getTime();\n  if (isNaN(rowCreatedTime)) return false;\n\n  const hoursSinceCreated = (now - rowCreatedTime) / (1000 * 60 * 60);\n\n  return (\n    rowEmail.toLowerCase() === input.email.toLowerCase() &&\n    rowSubject === input.subject &&\n    hoursSinceCreated >= 0 &&\n    hoursSinceCreated < DUPLICATE_WINDOW_HOURS\n  );\n});\n\nreturn [{ json: { ...input, isDuplicate } }];"
       },
       "id": "a1b2c3d4-0005-0005-0005-000000000005",
       "name": "Check — Duplicate Ticket",
@@ -381,10 +381,102 @@
           "mode": "name"
         },
         "columns": {
-          "mappingMode": "autoMapInputData",
-          "value": {},
-          "matchingColumns": [],
-          "schema": []
+          "mappingMode": "defineBelow",
+          "value": {
+            "Ticket ID": "={{ $json['Ticket ID'] }}",
+            "Customer Name": "={{ $json['Customer Name'] }}",
+            "Email": "={{ $json['Email'] }}",
+            "Subject": "={{ $json['Subject'] }}",
+            "Message": "={{ $json['Message'] }}",
+            "Priority": "={{ $json['Priority'] }}",
+            "Category": "={{ $json['Category'] }}",
+            "Summary": "={{ $json['Summary'] }}",
+            "Sentiment": "={{ $json['Sentiment'] }}",
+            "Created Date": "={{ $json['Created Date'] }}",
+            "Status": "={{ $json['Status'] }}"
+          },
+          "matchingColumns": [
+            "Ticket ID"
+          ],
+          "schema": [
+            {
+              "id": "Ticket ID",
+              "displayName": "Ticket ID",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Sentiment",
+              "displayName": "Sentiment",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Created Date",
+              "displayName": "Created Date",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false
+            }
+          ]
         },
         "options": {}
       },
@@ -690,6 +782,6 @@
     }
   ],
   "triggerCount": 0,
-  "updatedAt": "2026-07-29T00:00:00.000Z",
-  "versionId": "v1.0.0"
+  "updatedAt": "2026-07-30T00:00:00.000Z",
+  "versionId": "v1.1.0"
 }

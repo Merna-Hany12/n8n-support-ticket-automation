@@ -2,8 +2,8 @@
 ### Usage: You can use the "REST Client" extension in VS Code to run these directly,
 ### or import this format into Postman/Insomnia.
 
-@webhook_url = https://mernagazer.app.n8n.cloud/webhook/ticket
-@api_key = my-secure-api-key-123
+@webhook_url = your_webhook_url
+@api_key = your_api_key
 
 
 ### 1. Valid High Priority Ticket (Should trigger Telegram & Sheet)
@@ -12,8 +12,8 @@ Content-Type: application/json
 X-API-Key: {{api_key}}
 
 {
-    "customer_name": "merna ",
-    "email": "Mernahany@example.com",
+    "customer_name": "merna h",
+    "email": "Mernfgny@example.com",
     "priority": "High",
     "subject": "System completely down",
     "message": "I cannot log in and my entire team is blocked."
